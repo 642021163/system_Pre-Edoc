@@ -1,26 +1,21 @@
 const express = require("express");
-const { motion } = require('framer-motion');
 const mysql = require("mysql2");
 const cors = require("cors");
 const path = require('path');
-const multer = require('multer');
-const fs = require('fs');
+const multer = require('multer'); //ใช้รับไฟล์ที่ถูกอัปโหลดจาก frontend ผ่าน form-data
+const fs = require('fs');//จัดการไฟล์ในเครื่อง เช่น อ่าน, เขียน, ลบ ไฟล์ด้วย Node.js
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
-// const secretKey = 'your_secret_key';
-// const saltRounds = 10; // จำนวนรอบของ salt สำหรับ bcrypt
 const winston = require('winston'); // เพิ่มไลบรารีสำหรับการล็อก
-const { v4: uuidv4 } = require('uuid');
-const { header, data } = require("framer-motion/client");
-const axios = require('axios');
+const { v4: uuidv4 } = require('uuid'); //สร้าง UUID (รหัสเฉพาะแบบไม่ซ้ำ)
+const axios = require('axios');//ใช้เรียก API ภายนอกหรือภายใน เช่น REST API
 const dotenv = require('dotenv'); // โหลด dotenv
-// โหลดไฟล์ .env ที่อยู่นอกโฟลเดอร์ backend
-dotenv.config({ path: path.resolve(__dirname, '../.env') });
-
+const fs = require('fs'); //คุณต้องใช้ Node.js fs เพื่อลบไฟล์ในระบบไฟล์พร้อมกับลบในฐานข้อมูล
+const path = require('path');
+dotenv.config({ path: path.resolve(__dirname, '../.env') });// โหลดไฟล์ .env ที่อยู่นอกโฟลเดอร์ backend
 const port = process.env.PORT || 3000;
 const saltRounds = parseInt(process.env.SALT_ROUNDS) || 10;
 const secretKey = process.env.JWT_SECRET || 'your_secret_key';
-
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -40,13 +35,10 @@ db.connect((err) => {
     }
 });
 
-
-
-//Apiหน้า RegisterFrom ฝั่ง user
+//API หน้า RegisterFrom ฝั่ง user
 app.post('/users', async (req, res) => {
     try {
         console.log('Received request to create user account with data:', req.body);
-
         const hashedPassword = await bcrypt.hash(req.body.password, saltRounds); // เข้ารหัสรหัสผ่านด้วย bcrypt
         const sql = "INSERT INTO users (prefix, user_fname, user_lname, username, password, phone_number, affiliation, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         const values = [
@@ -73,7 +65,6 @@ app.post('/users', async (req, res) => {
     }
 });
 
-
 // ตรวจสอบชื่อผู้ใช้
 app.get('/check-username', async (req, res) => {
     const username = req.query.username;
@@ -89,9 +80,7 @@ app.get('/check-username', async (req, res) => {
     }
 });
 
-
-//Api หน้า LoginFrom ฝั่ง User
-
+//API หน้า LoginFrom ฝั่ง User
 // สร้าง middleware เพื่อตรวจสอบ JWT และยืนยันการเข้าถึง
 const authenticateToken = (req, res, next) => {
     const token = req.headers['authorization']?.split(' ')[1];
@@ -139,32 +128,24 @@ async function findUserByUsernameAndType(username, userType, correlationId) { //
     });
 }
 
-// api สำหรับ Login
+// API สำหรับ Login
 app.post('/login', async (req, res) => {
     const correlationId = uuidv4(); // สร้าง correlationId ใหม่สำหรับคำขอแต่ละครั้ง
 
     try {
         const { username, password, userType } = req.body;
-
-
         logger.info('Login attempt', { correlationId, username, userType });
-
         const user = await findUserByUsernameAndType(username, userType, correlationId);
-
         if (!user) {
             logger.warn('Invalid username or userType', { correlationId, username, userType });
             return res.status(400).json({ message: 'กรุณาเลือกประเภทผู้ใช้งาน' });
         }
-
         const isPasswordValid = await comparePassword(password, user.password);
-
         if (!isPasswordValid) {
             logger.warn('Invalid password attempt', { correlationId, username });
             return res.status(401).json({ message: 'รหัสผ่านหรือชื่อผู้ใช้ไม่ถูกต้อง' });
         }
-
         const token = jwt.sign({ userId: user.user_id, userType: user.role }, secretKey, { expiresIn: '1h' });
-
         const responseData = {
             message: 'Login successful',
             token,
@@ -177,11 +158,8 @@ app.post('/login', async (req, res) => {
             affiliation: user.affiliation || '',
             userType: user.role,
         };
-
         logger.info('Login successful', { correlationId, responseData });
-
         res.json(responseData);
-
     } catch (error) {
         logger.error('Login error', { correlationId, error });
         res.status(500).json({ message: 'Internal server error' });
@@ -199,10 +177,8 @@ app.get('/admin-only-route', authenticateToken, authorizeAdmin, (req, res) => {
     res.json({ message: 'This is an admin-only route', user: req.user });
 });
 
-
-
-//Api หน้า FileUpload ฝั่ง User
-// ตั้งค่าการจัดเก็บไฟล์ ฝั่ง user
+//API หน้า FileUpload ฝั่ง USER
+// ตั้งค่าการจัดเก็บไฟล์ ฝั่ง USER
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
@@ -235,7 +211,7 @@ const storage = multer.diskStorage({
     }
 });
 
-// ใช้งาน `multer` สำหรับการอัปโหลดไฟล์ ฝั่ง user
+// ใช้งาน `multer` สำหรับการอัปโหลดไฟล์ ฝั่ง USER
 const upload = multer({ storage: storage }); // สร้าง instance ของ multer
 // API สำหรับอัปโหลดเอกสาร
 app.post('/documents', upload.single('file'), async (req, res) => {
@@ -284,8 +260,6 @@ app.post('/documents', upload.single('file'), async (req, res) => {
     });
 });
 
-
-
 // ฟังก์ชันส่งการแจ้งเตือน LINE
 const sendLineNotification = async (token, message) => {
     try {
@@ -305,8 +279,6 @@ const sendLineNotification = async (token, message) => {
     }
 };
 
-
-
 // สร้าง API Endpoint สำหรับการส่งการแจ้งเตือน
 app.post('/send-notification', async (req, res) => {
     const { token, message } = req.body;
@@ -324,23 +296,20 @@ app.get('/logina', (req, res) => {
     return res.status(200).json({ message: 'bbbbbbbbbbbbbbbbbb' });
 });
 
-// Api หน้า TrackDocuments ฝั่ง User
-// สำหรับดึงข้อมูลเอกสารทั้งหมด ฝั่ง user
+// API หน้า TrackDocuments ฝั่ง USER
+// สำหรับดึงข้อมูลเอกสารทั้งหมด ฝั่ง USER
 app.get('/documents', authenticateToken, (req, res) => {
     const userId = req.user.userId; // ดึง userId จาก token
-
     const sql = `
     SELECT document_id, create_at, subject, to_recipient, file, status, document_number, document_type, notes, recipient, reply
     FROM documents
     WHERE user_id = ?  
     `;
-
     db.query(sql, [userId], (err, results) => { // ส่ง userId เป็น parameter
         if (err) {
             console.error('Database Error:', err.code, err.message, err.sql);
             return res.status(500).json({ message: "Error fetching documents", error: err.message });
         }
-
         // แปลงข้อมูลเพื่อส่งเฉพาะข้อมูลที่ต้องการ
         const formattedResults = results.map(doc => ({
             document_id: doc.document_id,
@@ -354,8 +323,6 @@ app.get('/documents', authenticateToken, (req, res) => {
             notes: doc.notes,
             to_recipient: doc.to_recipient,
             reply: doc.reply
-
-
         }));
 
         console.log('Documents fetched successfully:', formattedResults);
@@ -363,7 +330,7 @@ app.get('/documents', authenticateToken, (req, res) => {
     });
 });
 
-// เส้นทางสำหรับดึงข้อมูลเอกสารตาม ID ฝั่ง user
+// เส้นทางสำหรับดึงข้อมูลเอกสารตาม ID ฝั่ง USER
 app.get('/documents/:id', (req, res) => {
     const documentId = req.params.id; // ดึง ID จากพารามิเตอร์ URL
     if (!documentId) {
@@ -402,7 +369,6 @@ app.put('/useredit/document/:id', upload.single('file'), (req, res) => {
         UPDATE documents
         SET upload_date = ?, subject = ?, to_recipient = ?, document_type = ?, notes = ? ${newFileName ? ', file = ?' : ''}
         WHERE document_id = ?`;
-
     const params = newFileName
         ? [upload_date, subject, to_recipient, document_type, notes, newFileName, docId]
         : [upload_date, subject, to_recipient, document_type, notes, docId];
@@ -418,18 +384,14 @@ app.put('/useredit/document/:id', upload.single('file'), (req, res) => {
         res.status(200).json({ message: 'Document updated successfully' });
     });
 });
-
 // เพิ่ม middleware สำหรับ error handling
 app.use((err, req, res, next) => {
     console.error('Unexpected error occurred:', err);
     res.status(500).json({ message: 'An unexpected error occurred', error: err.message });
 });
 
-
-
-
-//Api หน้า UserProfile ฝั่ง User
-// ดึงข้อมูลผู้ใช้ตาม ID ฝั่ง user
+//API หน้า UserProfile ฝั่ง USER
+// ดึงข้อมูลผู้ใช้ตาม ID ฝั่ง USER
 app.get('/users-profile/:id', (req, res) => {
     const userId = req.params.id;  // ดึงค่า id จาก URL
 
@@ -450,7 +412,7 @@ app.get('/users-profile/:id', (req, res) => {
     });
 });
 
-// อัปเดตข้อมูลผู้ใช้ตาม ID ฝั่ง user
+// อัปเดตข้อมูลผู้ใช้ตาม ID ฝั่ง USER
 app.put('/users/:id', (req, res) => {
     const userId = req.params.id;
     const updatedUser = req.body;
@@ -478,7 +440,6 @@ app.put('/users/:id', (req, res) => {
         return res.status(200).json({ message: 'User updated successfully' });
     });
 });
-
 
 // API สำหรับเปลี่ยนรหัสผ่าน
 app.put('/users/change-password/:id', async (req, res) => {
@@ -519,7 +480,7 @@ app.put('/users/change-password/:id', async (req, res) => {
         return res.status(500).json({ message: 'ข้อผิดพลาดภายในเซิร์ฟเวอร์', error: err.message });
     }
 });
-//ฝั่ง User
+//ฝั่ง USER
 // API สำหรับดึงจำนวนเอกสารของผู้ใช้ตาม user_id
 app.get('/api/user-document-count', (req, res) => {
     const userId = req.query.user_id; // รับ user_id จาก query parameter
@@ -558,7 +519,6 @@ app.get('/api/user-document-success', (req, res) => {
         res.json({ count: result[0].count }); // ส่งจำนวนเอกสารกลับไปยัง client
     });
 });
-
 
 //Api หน้า AdminHome ฝั่ง Admin
 // API สำหรับดึงจำนวนผู้ใช้จากตาราง users
@@ -600,7 +560,6 @@ app.get('/api/unread-document-count', (req, res) => {
     });
 });
 
-
 //Api หน้า Documents ฝั่ง Admin
 // เส้นทางสำหรับดึงข้อมูลเอกสารทั้งหมด ฝั่ง admin
 app.get('/admin/documents', (req, res) => {
@@ -625,9 +584,6 @@ app.get('/admin/documents', (req, res) => {
         return res.status(200).json(results);
     });
 });
-
-
-
 
 // // API สำหรับดึงจำนวนเอกสารจากตาราง Documents ฝั่ง Addmin
 app.get('/document/unread', (req, res) => {
@@ -659,7 +615,6 @@ app.put('/document/:id/read', (req, res) => {
     });
 });
 
-
 //Api หน้า UserList ฝั่ง Admin
 // เส้นทางสำหรับดึงข้อมูลผู้ใช้ทั้งหมดฝั่ง Addmin
 app.get('/api/users', (req, res) => {
@@ -677,8 +632,6 @@ app.get('/api/users', (req, res) => {
         return res.status(200).json(results);
     });
 });
-
-
 
 // ดึงเอกสารตามไอดีฝั่ง Admin
 app.get('/document/:id', (req, res) => {
@@ -739,32 +692,32 @@ app.put('/documents/:id', (req, res) => {
 app.delete('/document/:id', (req, res) => {
     const docId = req.params.id;
 
-    // ลบการอ้างอิงใน document_receipts ก่อน
-    const deleteReferences = 'DELETE FROM document_receipts WHERE document_id = ?';
-    db.query(deleteReferences, [docId], (err, result) => {
-        if (err) {
-            console.error('Error deleting references:', err.code, err.message);
-            return res.status(500).json({ message: "Error deleting references", error: err.message });
-        }
+    // ดึงชื่อไฟล์ก่อนลบ
+    db.query('SELECT file FROM documents WHERE document_id = ?', [docId], (err, results) => {
+        if (err) return res.status(500).json({ message: "Error fetching document", error: err.message });
+        if (results.length === 0) return res.status(404).json({ message: 'Document not found' });
 
+        const filePath = path.join(__dirname, '../uploads', results[0].file);
 
-        // ลบเอกสาร
-        const deleteDocument = 'DELETE FROM documents WHERE document_id = ?';
-        db.query(deleteDocument, [docId], (err, result) => {
-            if (err) {
-                console.error('Database Error:', err.code, err.message);
-                return res.status(500).json({ message: "Error deleting document", error: err.message });
-            }
-            if (result.affectedRows === 0) {
-                return res.status(404).json({ message: 'Document not found' });
-            }
-            console.log('Document deleted:', result);
-            return res.status(200).json({ message: 'Document deleted successfully' });
+        // ลบการอ้างอิงใน document_receipts
+        db.query('DELETE FROM document_receipts WHERE document_id = ?', [docId], (err) => {
+            if (err) return res.status(500).json({ message: "Error deleting references", error: err.message });
+
+            // ลบเอกสารในฐานข้อมูล
+            db.query('DELETE FROM documents WHERE document_id = ?', [docId], (err, result) => {
+                if (err) return res.status(500).json({ message: "Error deleting document", error: err.message });
+                if (result.affectedRows === 0) return res.status(404).json({ message: 'Document not found' });
+
+                // ลบไฟล์จริง
+                fs.unlink(filePath, (err) => {
+                    if (err) console.warn('Warning: File not found or cannot delete:', err.message);
+                });
+
+                return res.status(200).json({ message: 'Document deleted successfully' });
+            });
         });
     });
 });
-
-
 
 
 // API สำหรับรีเซ็ตรหัสผ่าน ฝั่ง admin
@@ -796,7 +749,6 @@ app.put('/api/reset-password/:userId', async (req, res) => {
         res.status(500).json({ error: 'Internal server error' });
     }
 });
-
 
 //Api เส้น EditUser
 // ดึงข้อมูล user ตามไอดีฝั่ง Admin
@@ -850,7 +802,6 @@ app.put('/user/:id', (req, res) => {
     });
 });
 
-
 // API สำหรับอัปเดตผู้รับเอกสาร (received_by) ฝั่ง Admin
 app.put('/document/:id/status', (req, res) => {
     const { received_by } = req.body; // รับค่า received_by จาก body
@@ -871,9 +822,6 @@ app.put('/document/:id/status', (req, res) => {
         res.send('Document received_by updated successfully');
     });
 });
-
-
-
 
 // Endpoint สำหรับบันทึกข้อมูลการรับเอกสาร
 app.post('/document-stats', (req, res) => {
@@ -916,8 +864,6 @@ app.post('/api/document_receipts', (req, res) => {
         res.send('Document receipt recorded successfully');
     });
 });
-
-
 
 // Endpoint สำหรับดึงข้อมูลทั้งหมดจากตาราง document_receipts
 app.get('/document-receipts', (req, res) => {
@@ -970,8 +916,6 @@ app.get('/receipts', (req, res) => {
         res.json(results);
     });
 });
-
-
 
 
 //API นี้จะดึงข้อมูลผู้ใช้ที่มีบทบาทเป็นแอดมินจากฐานข้อมูล
